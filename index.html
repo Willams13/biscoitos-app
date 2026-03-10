@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4f46e5">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<title>Controle de Biscoitos</title>
+
+<style>
+
+*{
+box-sizing:border-box;
+font-family:system-ui,-apple-system,Segoe UI,Roboto;
+}
+
+body{
+margin:0;
+background:#f4f6fb;
+color:#222;
+}
+
+header{
+background:#4f46e5;
+color:white;
+padding:16px;
+font-size:20px;
+font-weight:bold;
+text-align:center;
+box-shadow:0 4px 12px rgba(0,0,0,.15);
+}
+
+.top{
+display:flex;
+flex-wrap:wrap;
+gap:10px;
+justify-content:center;
+padding:15px;
+}
+
+button{
+border:none;
+border-radius:12px;
+padding:10px 14px;
+font-weight:bold;
+cursor:pointer;
+background:#4f46e5;
+color:white;
+transition:.2s;
+}
+
+button:hover{
+transform:scale(1.05);
+background:#4338ca;
+}
+
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+gap:14px;
+padding:15px;
+}
+
+.card{
+background:white;
+border-radius:16px;
+padding:14px;
+box-shadow:0 6px 16px rgba(0,0,0,.12);
+transition:.2s;
+}
+
+.card:hover{
+transform:translateY(-3px);
+}
+
+.zero{
+background:#ffdcdc;
+}
+
+.nome{
+font-weight:bold;
+font-size:16px;
+margin-bottom:6px;
+}
+
+.modal{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,.5);
+display:none;
+align-items:center;
+justify-content:center;
+}
+
+.box{
+background:white;
+padding:20px;
+border-radius:16px;
+max-width:320px;
+width:90%;
+text-align:center;
+}
+
+input{
+padding:8px;
+border-radius:8px;
+border:1px solid #ccc;
+width:70px;
+text-align:center;
+}
+
+.anim{
+position:fixed;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+background:#22c55e;
+color:white;
+padding:18px 28px;
+border-radius:20px;
+font-size:20px;
+display:none;
+box-shadow:0 8px 20px rgba(0,0,0,.2);
+}
+
+</style>
+</head>
+
+<body>
+
+<header>🍪 Controle de Biscoitos</header>
+
+<div class="top">
+
+<button onclick="abrirCasa()">Estoque casa</button>
+<button onclick="abrirCarrinho()">Carrinho</button>
+<button onclick="abrirVendas()">Vendas hoje</button>
+<button onclick="abrirLote()">Produzir lote</button>
+
+</div>
+
+<div class="grid" id="lista"></div>
+
+<div class="anim" id="anim">Venda confirmada ✔</div>
+
+<!-- venda -->
+
+<div class="modal" id="modalVenda">
+<div class="box">
+
+<h3 id="tituloVenda"></h3>
+
+<input type="number" id="qtd" value="1" min="1">
+
+<br><br>
+
+<button onclick="vender()">Vender</button>
+<button onclick="addCarrinho()">Carrinho</button>
+
+<br><br>
+
+<button onclick="fecharVenda()">Cancelar</button>
+
+</div>
+</div>
+
+<!-- carrinho -->
+
+<div class="modal" id="modalCarrinho">
+<div class="box">
+
+<h3>Carrinho</h3>
+
+<div id="listaCarrinho"></div>
+
+<br>
+
+<button onclick="confirmarCarrinho()">Confirmar venda</button>
+
+<br><br>
+
+<button onclick="fecharCarrinho()">Fechar</button>
+
+</div>
+</div>
+
+<!-- vendas -->
+
+<div class="modal" id="modalVendas">
+<div class="box">
+
+<h3>Vendas de hoje</h3>
+
+<div id="vendasHoje"></div>
+
+<br>
+
+<button onclick="fecharVendas()">Fechar</button>
+
+</div>
+</div>
+
+<!-- estoque casa -->
+
+<div class="modal" id="modalCasa">
+<div class="box">
+
+<h3>Estoque casa</h3>
+
+<div id="listaCasa"></div>
+
+<br>
+
+<button onclick="fecharCasa()">Fechar</button>
+
+</div>
+</div>
+
+<!-- produzir lote -->
+
+<div class="modal" id="modalLote">
+<div class="box">
+
+<h3>Produzir lote</h3>
+
+<div id="inputsLote"></div>
+
+<br>
+
+<button onclick="confirmarLote()">Adicionar ao estoque</button>
+
+<br><br>
+
+<button onclick="fecharLote()">Cancelar</button>
+
+</div>
+</div>
+
+<script>
+
+const sabores=[
+"Brigadeiro",
+"Bem-casado",
+"Doce de leite",
+"Chocolate",
+"Chocoresco",
+"Morango",
+"Flocos"
+]
+
+let loja=JSON.parse(localStorage.loja||"{}")
+let casa=JSON.parse(localStorage.casa||"{}")
+let vendidos=JSON.parse(localStorage.vendidos||"{}")
+let vendasHoje=JSON.parse(localStorage.vendasHoje||"{}")
+
+let carrinho=[]
+let saborAtual=null
+
+let hoje=new Date().toDateString()
+
+if(localStorage.data!=hoje){
+
+vendasHoje={}
+localStorage.data=hoje
+
+}
+
+sabores.forEach(s=>{
+
+if(loja[s]==null)loja[s]=0
+if(casa[s]==null)casa[s]=0
+if(vendidos[s]==null)vendidos[s]=0
+if(vendasHoje[s]==null)vendasHoje[s]=0
+
+})
+
+function salvar(){
+
+localStorage.loja=JSON.stringify(loja)
+localStorage.casa=JSON.stringify(casa)
+localStorage.vendidos=JSON.stringify(vendidos)
+localStorage.vendasHoje=JSON.stringify(vendasHoje)
+
+}
+
+function render(){
+
+let lista=document.getElementById("lista")
+lista.innerHTML=""
+
+sabores.forEach(s=>{
+
+let card=document.createElement("div")
+card.className="card"
+
+if(loja[s]==0)card.classList.add("zero")
+
+card.innerHTML=`
+
+<div class="nome">${s}</div>
+
+<div>Loja: ${loja[s]}</div>
+
+<br>
+
+<button onclick="repor('${s}')">Reposição</button>
+<button onclick="abrirVenda('${s}')">Venda</button>
+
+`
+
+lista.appendChild(card)
+
+})
+
+}
+
+function repor(s){
+
+if(casa[s]>0){
+
+loja[s]++
+casa[s]--
+
+salvar()
+render()
+
+}
+
+}
+
+function abrirVenda(s){
+
+saborAtual=s
+
+document.getElementById("tituloVenda").innerText=s
+document.getElementById("modalVenda").style.display="flex"
+
+}
+
+function fecharVenda(){
+
+modalVenda.style.display="none"
+
+}
+
+function vender(){
+
+let q=parseInt(qtd.value)
+
+if(loja[saborAtual]>=q){
+
+loja[saborAtual]-=q
+vendidos[saborAtual]+=q
+vendasHoje[saborAtual]+=q
+
+anim()
+
+salvar()
+render()
+
+}
+
+fecharVenda()
+
+}
+
+function addCarrinho(){
+
+let q=parseInt(qtd.value)
+
+carrinho.push({sabor:saborAtual,qtd:q})
+
+fecharVenda()
+
+}
+
+function abrirCarrinho(){
+
+let div=document.getElementById("listaCarrinho")
+
+div.innerHTML=""
+
+carrinho.forEach(i=>{
+
+div.innerHTML+=`${i.sabor} - ${i.qtd}<br>`
+
+})
+
+modalCarrinho.style.display="flex"
+
+}
+
+function fecharCarrinho(){
+
+modalCarrinho.style.display="none"
+
+}
+
+function confirmarCarrinho(){
+
+carrinho.forEach(i=>{
+
+if(loja[i.sabor]>=i.qtd){
+
+loja[i.sabor]-=i.qtd
+vendidos[i.sabor]+=i.qtd
+vendasHoje[i.sabor]+=i.qtd
+
+}
+
+})
+
+carrinho=[]
+
+anim()
+
+salvar()
+render()
+
+fecharCarrinho()
+
+}
+
+function abrirVendas(){
+
+let div=document.getElementById("vendasHoje")
+
+div.innerHTML=""
+
+sabores.forEach(s=>{
+
+div.innerHTML+=`${s}: ${vendasHoje[s]}<br>`
+
+})
+
+modalVendas.style.display="flex"
+
+}
+
+function fecharVendas(){
+
+modalVendas.style.display="none"
+
+}
+
+function abrirCasa(){
+
+let div=document.getElementById("listaCasa")
+
+div.innerHTML=""
+
+sabores.forEach(s=>{
+
+div.innerHTML+=`
+
+${s}
+
+<input type="number" value="${casa[s]}" 
+onchange="casa['${s}']=parseInt(this.value);salvar()">
+
+<br><br>
+
+`
+
+})
+
+modalCasa.style.display="flex"
+
+}
+
+function fecharCasa(){
+
+modalCasa.style.display="none"
+
+}
+
+function abrirLote(){
+
+let div=document.getElementById("inputsLote")
+
+div.innerHTML=""
+
+sabores.forEach(s=>{
+
+div.innerHTML+=`
+
+${s}
+
+<input type="number" id="lote_${s}" value="0">
+
+<br><br>
+
+`
+
+})
+
+modalLote.style.display="flex"
+
+}
+
+function confirmarLote(){
+
+sabores.forEach(s=>{
+
+let v=parseInt(document.getElementById("lote_"+s).value)
+
+if(v>0){
+
+casa[s]+=v
+
+}
+
+})
+
+salvar()
+
+modalLote.style.display="none"
+
+}
+
+function fecharLote(){
+
+modalLote.style.display="none"
+
+}
+
+function anim(){
+
+let a=document.getElementById("anim")
+
+a.style.display="block"
+
+setTimeout(()=>{
+
+a.style.display="none"
+
+},1000)
+
+}
+
+render()
+
+</script>
+
+<script>
+if("serviceWorker" in navigator){
+navigator.serviceWorker.register("sw.js")
+}
+</script>
+</body> 
+</html>
